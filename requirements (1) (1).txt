@@ -1,0 +1,10 @@
+﻿streamlit
+pandas
+numpy
+plotly
+geopy
+folium
+streamlit-folium
+requests
+gspread
+google-auth
