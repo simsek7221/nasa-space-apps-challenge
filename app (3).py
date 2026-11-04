@@ -15,6 +15,60 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- MODERN PARLAK VE ŞEFFAF (GLASSMORPHISM) CSS STİLLERİ ---
+st.markdown("""
+<style>
+    /* Ana Sayfa Arka Planı (Hafif Gradyan Parlak Görünüm) */
+    .stApp {
+        background: linear-gradient(135deg, #f6f8fb 0%, #e2e8f0 100%);
+        color: #1e293b;
+    }
+    
+    /* Şeffaf ve Parlak Cam Efekti Kartları (Glassmorphism) */
+    div.stMarkdown, div.stPlotlyChart, div.element-container {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 18px;
+        padding: 1.4rem;
+        margin-bottom: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        box-shadow: 0 10px 30px 0 rgba(31, 38, 135, 0.08);
+    }
+    
+    /* Modern Buton Tasarımı */
+    .stButton>button {
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+        border-radius: 12px;
+        border: none;
+        padding: 0.6rem 1.4rem;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35);
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 22px rgba(79, 70, 229, 0.45);
+        background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    }
+    
+    /* Şeffaf Metin Kutuları */
+    .stTextInput>div>div>input {
+        background: rgba(255, 255, 255, 0.85);
+        border-radius: 12px;
+        border: 1px solid rgba(203, 213, 225, 0.8);
+        color: #1e293b;
+    }
+    
+    /* Başlık Renkleri */
+    h1, h2, h3 {
+        color: #0f172a;
+        font-weight: 700;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Google Colab / Sheets Entegrasyonu Kontrolü
 try:
     from google.colab import auth
@@ -52,13 +106,12 @@ def nasa_power_verisi_cek(lat, lon):
         t2m_dict = properties.get("T2M", {})
         prec_dict = properties.get("PRECTOTCORR", {})
         
-        # Son günün verisini al
         son_tarih = list(t2m_dict.keys())[-1]
         sicaklik = float(t2m_dict[son_tarih])
         yagis = float(prec_dict[son_tarih])
         return round(sicaklik, 1), round(yagis, 2)
     except Exception:
-        return 21.5, 0.05 # API erişiminde yedek değer
+        return 21.5, 0.05
 
 @st.cache_data(ttl=7200)
 def nasa_firms_yangin_kontrol(lat, lon):
@@ -66,7 +119,6 @@ def nasa_firms_yangin_kontrol(lat, lon):
     url = "https://firms.modaps.eosdis.nasa.gov/data/active_fire/c6/csv/MODIS_C6_1_Global_24h.csv"
     try:
         df_fire = pd.read_csv(url)
-        # Seçilen koordinatın 1 derece yakınındaki yangınları filtrele
         yakin_yanginlar = df_fire[
             (df_fire['latitude'].between(lat - 1.0, lat + 1.0)) & 
             (df_fire['longitude'].between(lon - 1.0, lon + 1.0))
@@ -76,12 +128,9 @@ def nasa_firms_yangin_kontrol(lat, lon):
         return 0
 
 def analiz_uret(lat, lon, mekan="Seçilen Konum"):
-    # 1. GERÇEK NASA API VERİLERİ
     sicaklik, yagis = nasa_power_verisi_cek(lat, lon)
     aktif_yangin_sayisi = nasa_firms_yangin_kontrol(lat, lon)
 
-    # 2. BİLİMSEL NDVI & YILDIRIM / AZOT FİKSASYONU MODELİ
-    # Yıldırım simülasyonu / NASA GLM mantığı (mevsimsel ve konumsal faktör)
     yildirim_aktif = (abs(lat) * abs(lon)) % 7 < 1.2
     yildirim_durumu = "⚡ NASA GLM: Yoğun Elektrik Deşarjı / Yıldırım Aktivitesi" if yildirim_aktif else "🟢 Sakin / Fırtına Yok"
 
@@ -105,7 +154,6 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     else:
         h_kalite = f"🟢 Temiz / İyi (PM2.5: {pm25})"
 
-    # Yangın Risk Skoru (NASA FIRMS + NASA POWER Sıcaklık/Yağış verisi ile)
     yangin_skoru = (sicaklik * 2.2) - (yagis * 20) + (aktif_yangin_sayisi * 40)
     if yangin_skoru > 55 or aktif_yangin_sayisi > 0:
         yangin_durumu = f"🔴 YÜKSEK RİSK ({aktif_yangin_sayisi} aktif termal nokta)"
@@ -141,14 +189,15 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     sicaklik_trend = [sicaklik-1.5, sicaklik-1, sicaklik-0.5, sicaklik, sicaklik, sicaklik+0.6, sicaklik+1.2]
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=yillar[:5], y=ndvi_trend[:5], mode='lines+markers', name='NDVI (Geçmiş NASA Modülü)', line=dict(color='green', width=3)))
-    fig.add_trace(go.Scatter(x=yillar[4:], y=ndvi_trend[4:], mode='lines+markers', name='NDVI (AI Projeksiyon)', line=dict(color='limegreen', width=3, dash='dash')))
-    fig.add_trace(go.Scatter(x=yillar, y=sicaklik_trend, mode='lines+markers', name='Sıcaklık (°C - NASA POWER)', yaxis="y2", line=dict(color='firebrick', width=2)))
+    fig.add_trace(go.Scatter(x=yillar[:5], y=ndvi_trend[:5], mode='lines+markers', name='NDVI (Geçmiş NASA Modülü)', line=dict(color='#10b981', width=3)))
+    fig.add_trace(go.Scatter(x=yillar[4:], y=ndvi_trend[4:], mode='lines+markers', name='NDVI (AI Projeksiyon)', line=dict(color='#34d399', width=3, dash='dash')))
+    fig.add_trace(go.Scatter(x=yillar, y=sicaklik_trend, mode='lines+markers', name='Sıcaklık (°C - NASA POWER)', yaxis="y2", line=dict(color='#ef4444', width=2)))
 
     fig.update_layout(
         title="📈 NASA Uydu Verileriyle NDVI & Sıcaklık Trend Projeksiyonu",
         height=300,
-        template="plotly_white",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
         yaxis=dict(title="NDVI İndeksi"),
         yaxis2=dict(title="Sıcaklık (°C)", overlaying="y", side="right"),
         legend=dict(orientation="h", y=1.15, x=0)
@@ -159,7 +208,7 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     folium.Marker([lat, lon], popup=mekan, tooltip=f"📍 {mekan}", icon=folium.Icon(color="green", icon="satellite", prefix='fa')).add_to(m)
 
     street_view_html = f"""
-    <div style="border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+    <div style="border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
       <iframe
         width="100%"
         height="280"
@@ -209,7 +258,7 @@ def yer_ara(yer):
 
 # --- STREAMLIT ARAYÜZÜ ---
 st.title("🛰️🌍 Lightning Flora: NASA Live Earth Observatory")
-st.caption("Gerçek Zamanlı NASA POWER & FIRMS API Entegrasyonu • Bulut Veritabanı Senkronizasyonu")
+st.caption("Gerçek Zamanlı NASA POWER & FIRMS API Entegrasyonu • Şeffaf & Parlak Enterprise UI")
 
 col_search, col_btn = st.columns([3, 1])
 with col_search:
