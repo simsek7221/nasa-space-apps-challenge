@@ -15,56 +15,53 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- MODERN PARLAK VE ŞEFFAF (GLASSMORPHISM) CSS STİLLERİ ---
+# --- KESİN ETKİLİ GLASSMORPHISM (ŞEFFAF VE PARLAK) CSS ---
 st.markdown("""
 <style>
-    /* Ana Sayfa Arka Planı (Hafif Gradyan Parlak Görünüm) */
+    /* 1. Arka Planı Modern Gradyan Yap */
     .stApp {
-        background: linear-gradient(135deg, #f6f8fb 0%, #e2e8f0 100%);
-        color: #1e293b;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+        color: #0f172a !important;
     }
     
-    /* Şeffaf ve Parlak Cam Efekti Kartları (Glassmorphism) */
-    div.stMarkdown, div.stPlotlyChart, div.element-container {
-        background: rgba(255, 255, 255, 0.75);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-radius: 18px;
-        padding: 1.4rem;
-        margin-bottom: 1rem;
-        border: 1px solid rgba(255, 255, 255, 0.9);
-        box-shadow: 0 10px 30px 0 rgba(31, 38, 135, 0.08);
+    /* 2. Ana İçerik Konteynerini Buzlu Cam Efektine Çevir */
+    .block-container {
+        background: rgba(255, 255, 255, 0.75) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border-radius: 24px !important;
+        padding: 2.5rem !important;
+        margin-top: 2rem !important;
+        border: 1px solid rgba(255, 255, 255, 0.9) !important;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05) !important;
     }
     
-    /* Modern Buton Tasarımı */
+    /* 3. Butonları Parlak Gradyan Yap */
     .stButton>button {
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-        color: white;
-        border-radius: 12px;
-        border: none;
-        padding: 0.6rem 1.4rem;
-        font-weight: 600;
-        box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35);
-        transition: all 0.3s ease;
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+        color: white !important;
+        border-radius: 14px !important;
+        border: none !important;
+        padding: 0.6rem 1.5rem !important;
+        font-weight: 600 !important;
+        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3) !important;
+        transition: all 0.3s ease !important;
     }
     .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 22px rgba(79, 70, 229, 0.45);
-        background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+        transform: translateY(-2px) !important;
+        box-shadow: 0 12px 25px rgba(79, 70, 229, 0.4) !important;
     }
     
-    /* Şeffaf Metin Kutuları */
-    .stTextInput>div>div>input {
-        background: rgba(255, 255, 255, 0.85);
-        border-radius: 12px;
-        border: 1px solid rgba(203, 213, 225, 0.8);
-        color: #1e293b;
+    /* 4. Metin Giriş Kutularını Şeffaflaştır */
+    .stTextInput input {
+        background: rgba(255, 255, 255, 0.85) !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(203, 213, 225, 0.8) !important;
+        color: #0f172a !important;
     }
     
-    /* Başlık Renkleri */
     h1, h2, h3 {
-        color: #0f172a;
-        font-weight: 700;
+        color: #0f172a !important;
     }
 </style>
 """, unsafe_allow_html=True)
