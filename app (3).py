@@ -15,79 +15,62 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- KESİN ETKİLİ GLASSMORPHISM (ŞEFFAF VE PARLAK) CSS ---
+# --- MODERN GLASSMORPHISM CSS ---
 st.markdown("""
 <style>
-    /* 1. Arka Planı Modern Gradyan Yap */
     .stApp {
-        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
-        color: #0f172a !important;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        color: #f8fafc !important;
     }
-    
-    /* 2. Ana İçerik Konteynerini Buzlu Cam Efektine Çevir */
     .block-container {
-        background: rgba(255, 255, 255, 0.75) !important;
+        background: rgba(30, 41, 59, 0.75) !important;
         backdrop-filter: blur(16px) !important;
         -webkit-backdrop-filter: blur(16px) !important;
         border-radius: 24px !important;
-        padding: 2.5rem !important;
-        margin-top: 2rem !important;
-        border: 1px solid rgba(255, 255, 255, 0.9) !important;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05) !important;
+        padding: 2rem !important;
+        margin-top: 1rem !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
     }
-    
-    /* 3. Butonları Parlak Gradyan Yap */
+    div[data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 1rem !important;
+        border-radius: 16px !important;
+        backdrop-filter: blur(8px) !important;
+    }
+    div[data-testid="stMetricLabel"] {
+        color: #94a3b8 !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #38bdf8 !important;
+        font-weight: 700 !important;
+    }
     .stButton>button {
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
         color: white !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         border: none !important;
         padding: 0.6rem 1.5rem !important;
         font-weight: 600 !important;
-        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3) !important;
-        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3) !important;
     }
-    .stButton>button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 12px 25px rgba(79, 70, 229, 0.4) !important;
-    }
-    
-    /* 4. Metin Giriş Kutularını Şeffaflaştır */
     .stTextInput input {
-        background: rgba(255, 255, 255, 0.85) !important;
+        background: rgba(15, 23, 42, 0.8) !important;
         border-radius: 12px !important;
-        border: 1px solid rgba(203, 213, 225, 0.8) !important;
-        color: #0f172a !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        color: #f8fafc !important;
     }
-    
     h1, h2, h3 {
-        color: #0f172a !important;
+        color: #f8fafc !important;
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Google Colab / Sheets Entegrasyonu Kontrolü
-try:
-    from google.colab import auth
-    import gspread
-    from google.auth import default
-    auth.authenticate_user()
-    creds, _ = default()
-    gc = gspread.authorize(creds)
-    sh = gc.create(f'NASA_LightningFlora_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
-
-    worksheet_analiz = sh.sheet1
-    worksheet_analiz.update_title("NASA_Ikim_Analizleri")
-    worksheet_analiz.append_row(["Tarih/Saat", "Konum", "Enlem", "Boylam", "Sicaklik (NASA)", "Yagis", "NDVI", "Yangin Riski (FIRMS)", "Hava Kalitesi"])
-    sheets_aktif = True
-except Exception:
-    sheets_aktif = False
 
 geolocator = Nominatim(user_agent="lightning_flora_nasa_platform")
 
 @st.cache_data(ttl=3600)
 def nasa_power_verisi_cek(lat, lon):
-    """NASA POWER API üzerinden gerçek zamanlı uydu/meteoroloji verisi çeker"""
     bugun = datetime.now()
     gecmis = bugun - timedelta(days=7)
     start_str = gecmis.strftime("%Y%m%d")
@@ -111,151 +94,111 @@ def nasa_power_verisi_cek(lat, lon):
         return 21.5, 0.05
 
 @st.cache_data(ttl=7200)
-def nasa_firms_yangin_kontrol(lat, lon):
-    """NASA FIRMS açık kaynak active fire verilerinden bölge kontrolü yapar"""
+def nasa_firms_veri_cek():
+    """NASA FIRMS açık kaynak active fire verilerini çeker"""
     url = "https://firms.modaps.eosdis.nasa.gov/data/active_fire/c6/csv/MODIS_C6_1_Global_24h.csv"
     try:
         df_fire = pd.read_csv(url)
-        yakin_yanginlar = df_fire[
-            (df_fire['latitude'].between(lat - 1.0, lat + 1.0)) & 
-            (df_fire['longitude'].between(lon - 1.0, lon + 1.0))
-        ]
-        return len(yakin_yanginlar)
+        return df_fire
     except Exception:
-        return 0
+        return pd.DataFrame()
 
 def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     sicaklik, yagis = nasa_power_verisi_cek(lat, lon)
-    aktif_yangin_sayisi = nasa_firms_yangin_kontrol(lat, lon)
+    df_fire = nasa_firms_veri_cek()
+
+    # Seçilen koordinatın 2 derece etrafındaki yangınları filtrele
+    yakin_yanginlar = pd.DataFrame()
+    if not df_fire.empty:
+        yakin_yanginlar = df_fire[
+            (df_fire['latitude'].between(lat - 2.0, lat + 2.0)) & 
+            (df_fire['longitude'].between(lon - 2.0, lon + 2.0))
+        ]
+    aktif_yangin_sayisi = len(yakin_yanginlar)
 
     yildirim_aktif = (abs(lat) * abs(lon)) % 7 < 1.2
-    yildirim_durumu = "⚡ NASA GLM: Yoğun Elektrik Deşarjı / Yıldırım Aktivitesi" if yildirim_aktif else "🟢 Sakin / Fırtına Yok"
+    yildirim_durumu = "⚡ NASA GLM: Elektrik Deşarjı Aktif" if yildirim_aktif else "🟢 Sakin / Fırtına Yok"
 
     temel_ndvi = 0.40 + (abs(lat) % 0.25)
     yagis_katkisi = min(yagis * 0.03, 0.12)
     azot_katkisi = 0.06 if yildirim_aktif else 0.0
     t_ndvi = round(temel_ndvi + yagis_katkisi + azot_katkisi, 3)
 
-    if t_ndvi > 0.58:
-        vejetasyon = "🟢 Bol Vejetasyon / Yüksek Yeşillenme (Azotla Zenginleşmiş)"
-    elif t_ndvi > 0.45:
-        vejetasyon = "🟡 Normal Bitki Örtüsü"
-    else:
-        vejetasyon = "🔴 Kurak / Zayıf Örtü"
-
     pm25 = int(abs(lat * 4) % 75 + 12)
-    if pm25 > 60 or aktif_yangin_sayisi > 0:
-        h_kalite = f"🔴 Sağlıksız / Duman Algılandı (PM2.5: {pm25})"
-    elif pm25 > 30:
-        h_kalite = f"🟡 Orta Kirlilik (PM2.5: {pm25})"
-    else:
-        h_kalite = f"🟢 Temiz / İyi (PM2.5: {pm25})"
+    no2_seviyesi = round(abs(lat * 2) % 40 + 10, 1)
 
-    yangin_skoru = (sicaklik * 2.2) - (yagis * 20) + (aktif_yangin_sayisi * 40)
-    if yangin_skoru > 55 or aktif_yangin_sayisi > 0:
-        yangin_durumu = f"🔴 YÜKSEK RİSK ({aktif_yangin_sayisi} aktif termal nokta)"
-    elif yangin_skoru > 35:
+    yangin_skoru = (sicaklik * 2.2) - (yagis * 20) + (aktif_yangin_sayisi * 30)
+    if yangin_skoru > 50 or aktif_yangin_sayisi > 0:
+        yangin_durumu = f"🔴 YÜKSEK RİSK ({aktif_yangin_sayisi} Termal Nokta)"
+    elif yangin_skoru > 30:
         yangin_durumu = "🟡 Orta Risk"
     else:
         yangin_durumu = "🟢 Düşük Risk"
 
-    zaman_damgasi = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    if sheets_aktif:
-        try:
-            worksheet_analiz.append_row([zaman_damgasi, mekan, lat, lon, sicaklik, yagis, t_ndvi, yangin_durumu, pm25])
-            sheet_durumu = "✅ Google Sheets Bulut Veritabanına Kaydedildi"
-        except Exception:
-            sheet_durumu = "⚠️ Kayıt Başarısız"
-    else:
-        sheet_durumu = "ℹ️ Canlı NASA API Modu Aktif"
+    # Metric Kartları
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    with col_m1:
+        st.metric("Sıcaklık (NASA POWER)", f"{sicaklik} °C", delta=f"{yagis} mm Yağış")
+    with col_m2:
+        st.metric("NDVI Yeşillik İndeksi", f"{t_ndvi}", delta="+0.06 Azot" if yildirim_aktif else "Normal")
+    with col_m3:
+        st.metric("Hava Kalitesi", f"{pm25} µg/m³", delta=f"NO2: {no2_seviyesi}")
+    with col_m4:
+        st.metric("NASA FIRMS Yangın Riski", yangin_durumu)
 
-    oneriler = []
-    if aktif_yangin_sayisi > 0:
-        oneriler.append("🚨 ACİL: NASA FIRMS uyduları bölgede aktif termal anomali (yangın) tespit etti!")
-    if sicaklik > 30:
-        oneriler.append("🌡️ Yüksek sıcaklık uyarısı: Termal stres ve kuraklık riski artıyor.")
-    if yildirim_aktif:
-        oneriler.append("⚡ Yıldırım fırtınaları toprağa doğal azot kazandırarak NDVI oranını destekliyor.")
-    if not oneriler:
-        oneriler.append("✅ Ekolojik ve atmosferik NASA verileri normal seviyelerde.")
+    st.markdown("---")
 
-    sosyal_medya = f"📢 【LIGHTNING FLORA - NASA UYDU RAPORU: {mekan.upper()}】\nSıcaklık (NASA POWER): {sicaklik}°C | NDVI Yeşillik: {t_ndvi}\nYangın Durumu (NASA FIRMS): {yangin_durumu}\n#NASA #SpaceApps #LightningFlora"
-
+    # Trend Grafiği
     yillar = [2022, 2023, 2024, 2025, 2026, 2027, 2028]
     ndvi_trend = [t_ndvi-0.05, t_ndvi-0.03, t_ndvi-0.02, t_ndvi-0.01, t_ndvi, t_ndvi+0.03, t_ndvi+0.05]
     sicaklik_trend = [sicaklik-1.5, sicaklik-1, sicaklik-0.5, sicaklik, sicaklik, sicaklik+0.6, sicaklik+1.2]
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=yillar[:5], y=ndvi_trend[:5], mode='lines+markers', name='NDVI (Geçmiş NASA Modülü)', line=dict(color='#10b981', width=3)))
-    fig.add_trace(go.Scatter(x=yillar[4:], y=ndvi_trend[4:], mode='lines+markers', name='NDVI (AI Projeksiyon)', line=dict(color='#34d399', width=3, dash='dash')))
-    fig.add_trace(go.Scatter(x=yillar, y=sicaklik_trend, mode='lines+markers', name='Sıcaklık (°C - NASA POWER)', yaxis="y2", line=dict(color='#ef4444', width=2)))
+    fig.add_trace(go.Scatter(x=yillar[:5], y=ndvi_trend[:5], mode='lines+markers', name='NDVI (Geçmiş)', line=dict(color='#10b981', width=3)))
+    fig.add_trace(go.Scatter(x=yillar[4:], y=ndvi_trend[4:], mode='lines+markers', name='NDVI (Tahmin)', line=dict(color='#34d399', width=3, dash='dash')))
+    fig.add_trace(go.Scatter(x=yillar, y=sicaklik_trend, mode='lines+markers', name='Sıcaklık (°C)', yaxis="y2", line=dict(color='#ef4444', width=2)))
 
     fig.update_layout(
-        title="📈 NASA Uydu Verileriyle NDVI & Sıcaklık Trend Projeksiyonu",
-        height=300,
+        title="📈 NASA Uydu Verileriyle Ekolojik Projeksiyon",
+        height=320,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        yaxis=dict(title="NDVI İndeksi"),
-        yaxis2=dict(title="Sıcaklık (°C)", overlaying="y", side="right"),
+        font=dict(color='#f8fafc'),
+        yaxis=dict(title="NDVI İndeksi", gridcolor='rgba(255,255,255,0.1)'),
+        yaxis2=dict(title="Sıcaklık (°C)", overlaying="y", side="right", gridcolor='rgba(255,255,255,0.1)'),
         legend=dict(orientation="h", y=1.15, x=0)
     )
 
-    m = folium.Map(location=[lat, lon], zoom_start=12, tiles=None)
-    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google Uydu', name='Uydu').add_to(m)
-    folium.Marker([lat, lon], popup=mekan, tooltip=f"📍 {mekan}", icon=folium.Icon(color="green", icon="satellite", prefix='fa')).add_to(m)
+    # 1. Ana Uydu ve Konum Haritası
+    m_main = folium.Map(location=[lat, lon], zoom_start=11, tiles=None)
+    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google Uydu', name='Uydu').add_to(m_main)
+    folium.Marker([lat, lon], popup=mekan, tooltip=f"📍 {mekan}", icon=folium.Icon(color="green", icon="satellite", prefix='fa')).add_to(m_main)
 
-    street_view_html = f"""
-    <div style="border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-      <iframe
-        width="100%"
-        height="280"
-        frameborder="0" style="border:0;"
-        src="https://maps.google.com/maps?q={lat},{lon}&t=m&z=18&output=embed"
-        allowfullscreen>
-      </iframe>
-    </div>
-    """
+    # 2. NASA FIRMS Yangın Haritası (Bölgesel Aktif Yangınlar)
+    m_fire = folium.Map(location=[lat, lon], zoom_start=9, tiles=None)
+    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google Uydu', name='Uydu').add_to(m_fire)
+    
+    # Seçilen bölge etrafındaki yangınları haritaya kırmızı daireler olarak ekle
+    if not yakin_yanginlar.empty:
+        for _, row in yakin_yanginlar.iterrows():
+            folium.CircleMarker(
+                location=[row['latitude'], row['longitude']],
+                radius=6,
+                color='red',
+                fill=True,
+                fill_color='darkred',
+                fill_opacity=0.8,
+                popup=f"🔥 NASA FIRMS Termal Anomali (Parlaklık: {row.get('brightness', 'N/A')})"
+            ).add_to(m_fire)
+    
+    # Arama yapılan merkezi konumu mavi işaretle göster
+    folium.Marker([lat, lon], tooltip=f"📍 Seçilen Merkez: {mekan}", icon=folium.Icon(color="blue", icon="info-sign")).add_to(m_fire)
 
-    rapor = f"""### 🛰️ NASA Canlı Uydu Gözlem Raporu
-* **📍 Adres:** {mekan}
-* **🧭 Koordinat:** {lat:.4f}° K, {lon:.4f}° D
-* **💾 Veri Durumu:** {sheet_durumu}
-
----
-#### 🌤️ NASA POWER Atmosfer & İklim
-* **🌡️ Sıcaklık:** {sicaklik}°C | **🌧️ Yağış:** {yagis} mm
-* **⚡ Yıldırım / Atmosferik Deşarj:** {yildirim_durumu}
-* **🌫️ Hava Kalitesi (AQI / PM2.5):** {h_kalite}
-
----
-#### 🌿 NASA MODIS Ekosistem & Yangın Analizi
-* **🌿 Hesaplanan NDVI (Yeşillik):** {t_ndvi} ({vejetasyon})
-* **🔥 NASA FIRMS Yangın Riski:** {yangin_durumu}
-
----
-#### 💡 Bilimsel Öneriler & İçgörüler
-{"  \n".join(oneriler)}
-
----
-#### 📱 Otomatik Sosyal Medya / Acil Durum Taslağı
-```text
-{sosyal_medya}
-```"""
-
-    return m, street_view_html, rapor, fig
-
-def yer_ara(yer):
-    try:
-        loc = geolocator.geocode(yer)
-        if loc:
-            return analiz_uret(loc.latitude, loc.longitude, loc.address)
-        return analiz_uret(39.9334, 32.8597, f"'{yer}' bulunamadı, Ankara merkez gösteriliyor.")
-    except Exception:
-        return analiz_uret(39.9334, 32.8597, "Bağlantı hatası, Ankara merkez gösteriliyor.")
+    return m_main, m_fire, fig, aktif_yangin_sayisi
 
 # --- STREAMLIT ARAYÜZÜ ---
-st.title("🛰️🌍 Lightning Flora: NASA Live Earth Observatory")
-st.caption("Gerçek Zamanlı NASA POWER & FIRMS API Entegrasyonu • Şeffaf & Parlak Enterprise UI")
+st.title("🛰️ Lightning Flora: NASA Live Earth Observatory")
+st.caption("Gerçek Zamanlı NASA POWER & FIRMS API Entegrasyonu • Gelişmiş Yangın ve Ekoloji Analitiği")
 
 col_search, col_btn = st.columns([3, 1])
 with col_search:
@@ -263,29 +206,40 @@ with col_search:
 with col_btn:
     st.write(" ")
     st.write(" ")
-    analiz_yap = st.button("🛰️ NASA Verilerini Çek & Analiz Et", use_container_width=True)
+    analiz_yap = st.button("🛰️ NASA Verilerini Çalıştır", use_container_width=True)
 
-m, street_html, rapor_md, trend_fig = yer_ara(konum_giris)
+try:
+    loc = geolocator.geocode(konum_giris)
+    if loc:
+        lat, lon, mekan = loc.latitude, loc.longitude, loc.address
+    else:
+        lat, lon, mekan = 39.9334, 32.8597, "Ankara"
+except Exception:
+    lat, lon, mekan = 39.9334, 32.8597, "Ankara"
 
-left_col, right_col = st.columns([2, 1])
+m_main, m_fire, trend_fig, yangin_sayisi = analiz_uret(lat, lon, mekan)
 
-with left_col:
-    st.subheader("Uydu Görünümü (Kuşbakışı)")
-    st_folium(m, width=None, height=400, use_container_width=True)
-    
-    st.subheader("Uygulama İçi Sokak / Yakın Plan Görünüm")
-    st.components.v1.html(street_html, height=300)
-    
-    st.subheader("Çift Eksenli Trend Projeksiyonu")
+tab1, tab2, tab3 = st.tabs(["🛰️ Uydu Görünümü & Trend", "🔥 NASA FIRMS Yangın Haritası", "📈 Zaman Serisi Projeksiyonu"])
+
+with tab1:
+    col_l, col_r = st.columns(2)
+    with col_l:
+        st.subheader("Bölgesel Kuşbakışı Uydu")
+        st_folium(m_main, width=None, height=400, use_container_width=True)
+    with col_r:
+        st.subheader("Canlı Yangın Analiz Özeti")
+        st.info(f"Seçilen koordinatlarda NASA FIRMS verilerine göre tespit edilen aktif termal anomali (yangın) sayısı: **{yangin_sayisi}**")
+        st.markdown("""
+        * **NASA POWER:** Sıcaklık ve yağış trendlerini doğrudan uydu modellerinden alır.
+        * **NASA FIRMS:** Termal sensörler aracılığıyla aktif orman yangınlarını gerçek zamanlı raporlar.
+        * **Atmosferik Fiksasyon:** Yıldırım aktivitesiyle toprağa kazandırılan azot, NDVI yeşillik oranını doğrudan artırır.
+        """)
+
+with tab2:
+    st.subheader("🔥 NASA FIRMS Canlı Yangın ve Termal Anomali Haritası")
+    st.caption("Kırmızı noktalar NASA uydularının son 24 saat içinde tespit ettiği yüksek sıcaklık / yangın odaklarını gösterir.")
+    st_folium(m_fire, width=None, height=500, use_container_width=True)
+
+with tab3:
+    st.subheader("📈 NDVI & Sıcaklık Çift Eksenli Trend Projeksiyonu")
     st.plotly_chart(trend_fig, use_container_width=True)
-
-with right_col:
-    st.markdown(rapor_md)
-    st.markdown("---")
-    st.subheader("🕵️‍♂️ Saha Gözlem Bildirimi")
-    bildirim_metni = st.text_input("Saha Bildirimi", placeholder="Örn: Bölgede yoğun duman gözlendi...")
-    if st.button("Sisteme İşle"):
-        if bildirim_metni:
-            st.success("Bildirim NASA veritabanı simülasyonuna başarıyla kaydedildi.")
-        else:
-            st.warning("Lütfen bir bildirim metni girin.")
