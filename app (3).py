@@ -95,7 +95,6 @@ def nasa_power_verisi_cek(lat, lon):
 
 @st.cache_data(ttl=7200)
 def nasa_firms_veri_cek():
-    """NASA FIRMS açık kaynak active fire verilerini çeker"""
     url = "https://firms.modaps.eosdis.nasa.gov/data/active_fire/c6/csv/MODIS_C6_1_Global_24h.csv"
     try:
         df_fire = pd.read_csv(url)
@@ -107,7 +106,6 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     sicaklik, yagis = nasa_power_verisi_cek(lat, lon)
     df_fire = nasa_firms_veri_cek()
 
-    # Seçilen koordinatın 2 derece etrafındaki yangınları filtrele
     yakin_yanginlar = pd.DataFrame()
     if not df_fire.empty:
         yakin_yanginlar = df_fire[
@@ -148,6 +146,29 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
 
     st.markdown("---")
 
+    # 1. Ana Uydu ve Konum Haritası
+    m_main = folium.Map(location=[lat, lon], zoom_start=11, tiles=None)
+    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google Uydu', name='Uydu').add_to(m_main)
+    folium.Marker([lat, lon], popup=mekan, tooltip=f"📍 {mekan}", icon=folium.Icon(color="green", icon="satellite", prefix='fa')).add_to(m_main)
+
+    # 2. NASA FIRMS Yangın Haritası
+    m_fire = folium.Map(location=[lat, lon], zoom_start=8, tiles=None)
+    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google Uydu', name='Uydu').add_to(m_fire)
+    
+    if not yakin_yanginlar.empty:
+        for _, row in yakin_yanginlar.iterrows():
+            folium.CircleMarker(
+                location=[row['latitude'], row['longitude']],
+                radius=6,
+                color='red',
+                fill=True,
+                fill_color='darkred',
+                fill_opacity=0.8,
+                popup=f"🔥 NASA FIRMS Termal Anomali (Parlaklık: {row.get('brightness', 'N/A')})"
+            ).add_to(m_fire)
+            
+    folium.Marker([lat, lon], tooltip=f"📍 Merkez: {mekan}", icon=folium.Icon(color="blue", icon="info-sign")).add_to(m_fire)
+
     # Trend Grafiği
     yillar = [2022, 2023, 2024, 2025, 2026, 2027, 2028]
     ndvi_trend = [t_ndvi-0.05, t_ndvi-0.03, t_ndvi-0.02, t_ndvi-0.01, t_ndvi, t_ndvi+0.03, t_ndvi+0.05]
@@ -169,36 +190,11 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
         legend=dict(orientation="h", y=1.15, x=0)
     )
 
-    # 1. Ana Uydu ve Konum Haritası
-    m_main = folium.Map(location=[lat, lon], zoom_start=11, tiles=None)
-    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google Uydu', name='Uydu').add_to(m_main)
-    folium.Marker([lat, lon], popup=mekan, tooltip=f"📍 {mekan}", icon=folium.Icon(color="green", icon="satellite", prefix='fa')).add_to(m_main)
-
-    # 2. NASA FIRMS Yangın Haritası (Bölgesel Aktif Yangınlar)
-    m_fire = folium.Map(location=[lat, lon], zoom_start=9, tiles=None)
-    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google Uydu', name='Uydu').add_to(m_fire)
-    
-    # Seçilen bölge etrafındaki yangınları haritaya kırmızı daireler olarak ekle
-    if not yakin_yanginlar.empty:
-        for _, row in yakin_yanginlar.iterrows():
-            folium.CircleMarker(
-                location=[row['latitude'], row['longitude']],
-                radius=6,
-                color='red',
-                fill=True,
-                fill_color='darkred',
-                fill_opacity=0.8,
-                popup=f"🔥 NASA FIRMS Termal Anomali (Parlaklık: {row.get('brightness', 'N/A')})"
-            ).add_to(m_fire)
-    
-    # Arama yapılan merkezi konumu mavi işaretle göster
-    folium.Marker([lat, lon], tooltip=f"📍 Seçilen Merkez: {mekan}", icon=folium.Icon(color="blue", icon="info-sign")).add_to(m_fire)
-
     return m_main, m_fire, fig, aktif_yangin_sayisi
 
 # --- STREAMLIT ARAYÜZÜ ---
 st.title("🛰️ Lightning Flora: NASA Live Earth Observatory")
-st.caption("Gerçek Zamanlı NASA POWER & FIRMS API Entegrasyonu • Gelişmiş Yangın ve Ekoloji Analitiği")
+st.caption("Gerçek Zamanlı NASA POWER & FIRMS API Entegrasyonu • Çift Uydu & Yangın Haritası")
 
 col_search, col_btn = st.columns([3, 1])
 with col_search:
@@ -219,27 +215,19 @@ except Exception:
 
 m_main, m_fire, trend_fig, yangin_sayisi = analiz_uret(lat, lon, mekan)
 
-tab1, tab2, tab3 = st.tabs(["🛰️ Uydu Görünümü & Trend", "🔥 NASA FIRMS Yangın Haritası", "📈 Zaman Serisi Projeksiyonu"])
+# İKİ HARİTAYI YAN YANA GÖSTEREN BÖLÜM
+st.subheader("🗺️ Çift Uydu Gözlem Paneli (Konum & NASA FIRMS Yangın Haritası)")
+map_col1, map_col2 = st.columns(2)
 
-with tab1:
-    col_l, col_r = st.columns(2)
-    with col_l:
-        st.subheader("Bölgesel Kuşbakışı Uydu")
-        st_folium(m_main, width=None, height=400, use_container_width=True)
-    with col_r:
-        st.subheader("Canlı Yangın Analiz Özeti")
-        st.info(f"Seçilen koordinatlarda NASA FIRMS verilerine göre tespit edilen aktif termal anomali (yangın) sayısı: **{yangin_sayisi}**")
-        st.markdown("""
-        * **NASA POWER:** Sıcaklık ve yağış trendlerini doğrudan uydu modellerinden alır.
-        * **NASA FIRMS:** Termal sensörler aracılığıyla aktif orman yangınlarını gerçek zamanlı raporlar.
-        * **Atmosferik Fiksasyon:** Yıldırım aktivitesiyle toprağa kazandırılan azot, NDVI yeşillik oranını doğrudan artırır.
-        """)
+with map_col1:
+    st.markdown("### 📍 Bölgesel Kuşbakışı Uydu")
+    st_folium(m_main, width=None, height=400, use_container_width=True)
 
-with tab2:
-    st.subheader("🔥 NASA FIRMS Canlı Yangın ve Termal Anomali Haritası")
-    st.caption("Kırmızı noktalar NASA uydularının son 24 saat içinde tespit ettiği yüksek sıcaklık / yangın odaklarını gösterir.")
-    st_folium(m_fire, width=None, height=500, use_container_width=True)
+with map_col2:
+    st.markdown("### 🔥 NASA FIRMS Yangın / Termal Haritası")
+    st.caption(f"Bölgede tespit edilen aktif termal odak: {yangin_sayisi} adet")
+    st_folium(m_fire, width=None, height=400, use_container_width=True)
 
-with tab3:
-    st.subheader("📈 NDVI & Sıcaklık Çift Eksenli Trend Projeksiyonu")
-    st.plotly_chart(trend_fig, use_container_width=True)
+st.markdown("---")
+st.subheader("📈 NDVI & Sıcaklık Çift Eksenli Trend Projeksiyonu")
+st.plotly_chart(trend_fig, use_container_width=True)
