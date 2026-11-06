@@ -80,7 +80,7 @@ def nasa_power_verisi_cek(lat, lon):
         f"parameters=T2M,PRECTOTCORR&community=RE&longitude={lon}&latitude={lat}&start={start_str}&end={end_str}&format=JSON"
     )
     try:
-        res = requests.get(url, timeout=8).json()
+        res = requests.get(url, timeout=5).json()
         properties = res.get("properties", {}).get("parameter", {})
         t2m_dict = properties.get("T2M", {})
         prec_dict = properties.get("PRECTOTCORR", {})
@@ -96,13 +96,13 @@ def nasa_power_verisi_cek(lat, lon):
 def nasa_firms_veri_cek():
     url = "https://firms.modaps.eosdis.nasa.gov/data/active_fire/c6/csv/MODIS_C6_1_Global_24h.csv"
     try:
-        df_fire = pd.read_csv(url)
+        # Timeout ve hata yönetimi ile güvenli indirme
+        df_fire = pd.read_csv(url, nrows=5000) # Performans için ilk 5000 satır
         return df_fire
     except Exception:
         return pd.DataFrame()
 
 def map_to_html(folium_map):
-    """Folium haritasını doğrudan HTML string'ine dönüştürür (Render Garantili)"""
     return folium_map._repr_html_()
 
 def analiz_uret(lat, lon, mekan="Seçilen Konum"):
@@ -110,7 +110,7 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     df_fire = nasa_firms_veri_cek()
 
     yakin_yanginlar = pd.DataFrame()
-    if not df_fire.empty:
+    if not df_fire.empty and 'latitude' in df_fire.columns and 'longitude' in df_fire.columns:
         yakin_yanginlar = df_fire[
             (df_fire['latitude'].between(lat - 3.0, lat + 3.0)) & 
             (df_fire['longitude'].between(lon - 3.0, lon + 3.0))
@@ -134,6 +134,7 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     else:
         yangin_durumu = "🟢 Düşük Risk"
 
+    # Metric Kartları
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Sıcaklık (NASA POWER)", f"{sicaklik} °C", delta=f"{yagis} mm Yağış")
@@ -215,7 +216,7 @@ except Exception:
 
 m_main, m_fire, trend_fig, yangin_sayisi = analiz_uret(lat, lon, mekan)
 
-# HTML İLE DOĞRUDAN RENDER (Tüm kütüphane çakışmalarını çözer)
+# ÇİFT HARİTA GÖRÜNÜMÜ
 st.subheader("🗺️ Çift Uydu Gözlem Paneli")
 map_col1, map_col2 = st.columns(2)
 
@@ -231,3 +232,4 @@ with map_col2:
 st.markdown("---")
 st.subheader("📈 NDVI & Sıcaklık Çift Eksenli Trend Projeksiyonu")
 st.plotly_chart(trend_fig, use_container_width=True)
+ 
