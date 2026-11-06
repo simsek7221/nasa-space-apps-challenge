@@ -109,8 +109,8 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     yakin_yanginlar = pd.DataFrame()
     if not df_fire.empty:
         yakin_yanginlar = df_fire[
-            (df_fire['latitude'].between(lat - 2.0, lat + 2.0)) & 
-            (df_fire['longitude'].between(lon - 2.0, lon + 2.0))
+            (df_fire['latitude'].between(lat - 3.0, lat + 3.0)) & 
+            (df_fire['longitude'].between(lon - 3.0, lon + 3.0))
         ]
     aktif_yangin_sayisi = len(yakin_yanginlar)
 
@@ -152,19 +152,19 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     folium.Marker([lat, lon], popup=mekan, tooltip=f"📍 {mekan}", icon=folium.Icon(color="green", icon="satellite", prefix='fa')).add_to(m_main)
 
     # 2. NASA FIRMS Yangın Haritası
-    m_fire = folium.Map(location=[lat, lon], zoom_start=8, tiles=None)
+    m_fire = folium.Map(location=[lat, lon], zoom_start=7, tiles=None)
     folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google Uydu', name='Uydu').add_to(m_fire)
     
     if not yakin_yanginlar.empty:
         for _, row in yakin_yanginlar.iterrows():
             folium.CircleMarker(
                 location=[row['latitude'], row['longitude']],
-                radius=6,
+                radius=7,
                 color='red',
                 fill=True,
                 fill_color='darkred',
-                fill_opacity=0.8,
-                popup=f"🔥 NASA FIRMS Termal Anomali (Parlaklık: {row.get('brightness', 'N/A')})"
+                fill_opacity=0.85,
+                popup=f"🔥 NASA FIRMS Termal Anomali"
             ).add_to(m_fire)
             
     folium.Marker([lat, lon], tooltip=f"📍 Merkez: {mekan}", icon=folium.Icon(color="blue", icon="info-sign")).add_to(m_fire)
@@ -215,18 +215,18 @@ except Exception:
 
 m_main, m_fire, trend_fig, yangin_sayisi = analiz_uret(lat, lon, mekan)
 
-# İKİ HARİTAYI YAN YANA GÖSTEREN BÖLÜM
+# İKİ HARİTAYI YAN YANA GÖSTEREN BÖLÜM (Benzersiz Keyler Eklendi)
 st.subheader("🗺️ Çift Uydu Gözlem Paneli (Konum & NASA FIRMS Yangın Haritası)")
 map_col1, map_col2 = st.columns(2)
 
 with map_col1:
     st.markdown("### 📍 Bölgesel Kuşbakışı Uydu")
-    st_folium(m_main, width=None, height=400, use_container_width=True)
+    st_folium(m_main, width=None, height=400, use_container_width=True, key="harita_ana")
 
 with map_col2:
     st.markdown("### 🔥 NASA FIRMS Yangın / Termal Haritası")
     st.caption(f"Bölgede tespit edilen aktif termal odak: {yangin_sayisi} adet")
-    st_folium(m_fire, width=None, height=400, use_container_width=True)
+    st_folium(m_fire, width=None, height=400, use_container_width=True, key="harita_yangin")
 
 st.markdown("---")
 st.subheader("📈 NDVI & Sıcaklık Çift Eksenli Trend Projeksiyonu")
