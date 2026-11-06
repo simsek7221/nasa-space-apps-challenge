@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import folium
-from streamlit_folium import st_folium
 import requests
 import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
@@ -102,6 +101,10 @@ def nasa_firms_veri_cek():
     except Exception:
         return pd.DataFrame()
 
+def map_to_html(folium_map):
+    """Folium haritasını doğrudan HTML string'ine dönüştürür (Render Garantili)"""
+    return folium_map._repr_html_()
+
 def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     sicaklik, yagis = nasa_power_verisi_cek(lat, lon)
     df_fire = nasa_firms_veri_cek()
@@ -115,8 +118,6 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
     aktif_yangin_sayisi = len(yakin_yanginlar)
 
     yildirim_aktif = (abs(lat) * abs(lon)) % 7 < 1.2
-    yildirim_durumu = "⚡ NASA GLM: Elektrik Deşarjı Aktif" if yildirim_aktif else "🟢 Sakin / Fırtına Yok"
-
     temel_ndvi = 0.40 + (abs(lat) % 0.25)
     yagis_katkisi = min(yagis * 0.03, 0.12)
     azot_katkisi = 0.06 if yildirim_aktif else 0.0
@@ -127,13 +128,12 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
 
     yangin_skoru = (sicaklik * 2.2) - (yagis * 20) + (aktif_yangin_sayisi * 30)
     if yangin_skoru > 50 or aktif_yangin_sayisi > 0:
-        yangin_durumu = f"🔴 YÜKSEK RİSK ({aktif_yangin_sayisi} Termal Nokta)"
+        yangin_durumu = f"🔴 YÜKSEK RİSK ({aktif_yangin_sayisi} Nokta)"
     elif yangin_skoru > 30:
         yangin_durumu = "🟡 Orta Risk"
     else:
         yangin_durumu = "🟢 Düşük Risk"
 
-    # Metric Kartları
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Sıcaklık (NASA POWER)", f"{sicaklik} °C", delta=f"{yagis} mm Yağış")
@@ -146,7 +146,7 @@ def analiz_uret(lat, lon, mekan="Seçilen Konum"):
 
     st.markdown("---")
 
-    # 1. Ana Uydu ve Konum Haritası
+    # 1. Ana Uydu Görünümü
     m_main = folium.Map(location=[lat, lon], zoom_start=11, tiles=None)
     folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google Uydu', name='Uydu').add_to(m_main)
     folium.Marker([lat, lon], popup=mekan, tooltip=f"📍 {mekan}", icon=folium.Icon(color="green", icon="satellite", prefix='fa')).add_to(m_main)
@@ -215,18 +215,18 @@ except Exception:
 
 m_main, m_fire, trend_fig, yangin_sayisi = analiz_uret(lat, lon, mekan)
 
-# İKİ HARİTAYI YAN YANA GÖSTEREN BÖLÜM (Benzersiz Keyler Eklendi)
-st.subheader("🗺️ Çift Uydu Gözlem Paneli (Konum & NASA FIRMS Yangın Haritası)")
+# HTML İLE DOĞRUDAN RENDER (Tüm kütüphane çakışmalarını çözer)
+st.subheader("🗺️ Çift Uydu Gözlem Paneli")
 map_col1, map_col2 = st.columns(2)
 
 with map_col1:
     st.markdown("### 📍 Bölgesel Kuşbakışı Uydu")
-    st_folium(m_main, width=None, height=400, use_container_width=True, key="harita_ana")
+    st.components.v1.html(map_to_html(m_main), height=400)
 
 with map_col2:
-    st.markdown("### 🔥 NASA FIRMS Yangın / Termal Haritası")
-    st.caption(f"Bölgede tespit edilen aktif termal odak: {yangin_sayisi} adet")
-    st_folium(m_fire, width=None, height=400, use_container_width=True, key="harita_yangin")
+    st.markdown("### 🔥 NASA FIRMS Yangın Haritası")
+    st.caption(f"Bölgedeki aktif termal odak: **{yangin_sayisi} adet**")
+    st.components.v1.html(map_to_html(m_fire), height=400)
 
 st.markdown("---")
 st.subheader("📈 NDVI & Sıcaklık Çift Eksenli Trend Projeksiyonu")
